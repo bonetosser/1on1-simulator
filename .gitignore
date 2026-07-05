@@ -1,0 +1,9 @@
+# 依存パッケージ
+node_modules/
+
+# テスト実行時の生成物（レポート・スクリーンショット）
+test/report/
+
+# OS由来
+.DS_Store
+Thumbs.db

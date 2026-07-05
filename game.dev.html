@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1on1練習シミュレーター（仮）</title>
+<meta name="description" content="AIが部下役を務める1on1の練習ソフト……のはずだった。元気な新人・無口なエンジニア・怯える総務、3人の部下と選択式で対話する短編ノベルゲーム（プレイ時間15分）。あなたのハラスメントリスク、判定します。">
+<!-- ▼ OGP: og:url と og:image は公開URL確定後に書き換えてください ▼ -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="1on1練習シミュレーター（仮）">
+<meta property="og:description" content="AIが部下役を務める1on1の練習ソフト……のはずだった。3人の部下と対話する短編ノベルゲーム（15分）。あなたのハラスメントリスク、判定します。">
+<meta property="og:url" content="https://REPLACE-WITH-YOUR-URL/">
+<meta property="og:image" content="https://REPLACE-WITH-YOUR-URL/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Google Analytics GA4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-S7SM3CJTX6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-S7SM3CJTX6');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #1a1c20;
+  --textbox-bg: rgba(14,16,20,0.82);
+  --textbox-border: rgba(255,255,255,0.10);
+  --text: #e8e9ec;
+  --text-dim: #8a8d96;
+  --name-bg: #2e4057;
+  --name-text: #e8e9ec;
+  --accent: #6fa3d0;
+  --accent-warm: #c97d4e;
+  --choice-bg: rgba(20,24,32,0.88);
+  --choice-btn-bg: rgba(46,64,87,0.70);
+  --choice-btn-hover: rgba(111,163,208,0.25);
+  --choice-btn-border: rgba(111,163,208,0.35);
+  --sys-btn: rgba(255,255,255,0.10);
+  --sys-btn-hover: rgba(255,255,255,0.20);
+  --log-bg: rgba(14,16,22,0.96);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #0d0e11;
+  font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ── ゲーム画面（16:9 コンテナ） ── */
+#game {
+  position: relative;
+  width: 100%;
+  /* dvh：アドレスバーを除いた実際の表示高さ。非対応ブラウザは100vhにフォールバック */
+  max-width: min(100vw, calc(100vh * 16/9));
+  max-width: min(100vw, calc(100dvh * 16/9));
+  max-width: min(100vw, calc(var(--vh, 1vh) * 100 * 16/9));
+  height: 100vh;
+  height: 100dvh;
+  height: calc(var(--vh, 1vh) * 100);
+  max-height: 100vh;
+  max-height: 100dvh;
+  aspect-ratio: 16/9;
+  margin: auto;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ── システムボタン（右上） ── */
+#sysbtn-wrap {
+  position: absolute;
+  top: 2.5%;
+  right: 2%;
+  display: flex;
+  gap: 0.5em;
+  z-index: 30;
+}
+.sys-btn {
+  background: rgba(30, 35, 48, 0.85);
+  border: 1px solid rgba(255,255,255,0.30);
+  border-radius: 4px;
+  color: rgba(255,255,255,0.85);
+  font-family: inherit;
+  font-size: clamp(9px, 1.1vw, 13px);
+  padding: 0.35em 0.75em;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  line-height: 1.4;
+  backdrop-filter: blur(4px);
+}
+.sys-btn:hover, .sys-btn.active {
+  background: rgba(60, 80, 110, 0.90);
+  border-color: rgba(255,255,255,0.55);
+  color: #ffffff;
+}
+
+/* ── プログレスバー（最上部） ── */
+#progress-wrap {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.07);
+  z-index: 25;
+}
+#progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-warm) 100%);
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+/* ── テキストボックス（下部固定） ── */
+#textbox {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  min-height: 28%;
+  max-height: 55%;
+  height: auto;
+  background: var(--textbox-bg);
+  border-top: 1px solid var(--textbox-border);
+  backdrop-filter: blur(4px);
+  padding: clamp(10px, 2%, 18px) clamp(14px, 3%, 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  cursor: pointer;
+  z-index: 20;
+  transition: opacity 0.2s;
+}
+#textbox.hidden { opacity: 0; pointer-events: none; }
+
+#speaker-name {
+  display: inline-block;
+  background: var(--name-bg);
+  color: var(--name-text);
+  font-size: clamp(10px, 1.3vw, 15px);
+  font-weight: 700;
+  padding: 0.25em 0.9em;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  min-width: 4em;
+  text-align: center;
+  align-self: flex-start;
+}
+#speaker-name:empty { display: none; }
+
+#dialogue-text {
+  font-family: "Noto Serif JP", serif;
+  font-size: clamp(13px, 1.8vw, 20px);
+  line-height: 1.85;
+  color: var(--text);
+  flex: 1;
+  overflow-y: auto;
+  white-space: pre-line;
+  /* スマホでのスクロールをスムーズに */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ▶ 次へ インジケーター */
+#advance-indicator {
+  position: absolute;
+  bottom: 1.2em;
+  right: 2em;
+  color: var(--accent);
+  font-size: clamp(10px, 1.2vw, 14px);
+  letter-spacing: 0.08em;
+  opacity: 0;
+  animation: blink 1s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+#advance-indicator.show { animation-play-state: running; opacity: 1; }
+
+/* ── ト書き・内心 表示（テキストボックス外・中央） ── */
+#stage-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 15;
+  pointer-events: none;
+  max-width: 80%;
+}
+.stage-note {
+  display: inline-block;
+  color: var(--text-dim);
+  font-size: clamp(11px, 1.4vw, 16px);
+  letter-spacing: 0.04em;
+  line-height: 1.7;
+  animation: fadeup 0.3s ease;
+}
+.thought-note {
+  color: #b0b8cc;
+  font-style: italic;
+  font-size: clamp(12px, 1.5vw, 17px);
+  line-height: 1.8;
+  animation: fadeup 0.3s ease;
+}
+.thought-note::before { content: "（"; }
+.thought-note::after  { content: "）"; }
+
+@keyframes fadeup {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── 選択肢オーバーレイ ── */
+#choices-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--choice-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8em;
+  padding: 5% 10%;
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+#choices-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+#choices-prompt {
+  font-size: clamp(10px, 1.2vw, 13px);
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 0.3em;
+  text-transform: uppercase;
+}
+.choice-btn {
+  width: 100%;
+  max-width: 600px;
+  background: var(--choice-btn-bg);
+  border: 1px solid var(--choice-btn-border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: "Noto Serif JP", serif;
+  font-size: clamp(12px, 1.6vw, 18px);
+  padding: 0.75em 1.4em;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  line-height: 1.65;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(2px);
+}
+.choice-btn:hover {
+  background: var(--choice-btn-hover);
+  border-color: var(--accent);
+  transform: translateX(4px);
+}
+.choice-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── バックログ ドロワー ── */
+#log-drawer {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: min(380px, 90%);
+  background: var(--log-bg);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  display: flex;
+  flex-direction: column;
+}
+#log-drawer.open { transform: translateX(0); }
+
+#log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1em 1.2em;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+#log-header span {
+  font-size: clamp(11px, 1.3vw, 14px);
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+}
+#log-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1.2em;
+  padding: 0.2em;
+  line-height: 1;
+}
+#log-close:hover { color: var(--text); }
+
+#log-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 1em 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9em;
+}
+.log-entry { animation: fadeup 0.2s ease; }
+.log-entry .log-speaker {
+  font-size: clamp(9px, 1vw, 11px);
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.2em;
+}
+.log-entry .log-text {
+  font-size: clamp(11px, 1.3vw, 14px);
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.log-entry.log-stage .log-text {
+  color: rgba(138,141,150,0.6);
+  font-style: italic;
+  font-size: clamp(10px, 1.1vw, 12px);
+}
+
+/* ── オーバーレイ背景（ログ閉じる用） ── */
+#log-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 45;
+  display: none;
+}
+#log-overlay.show { display: block; }
+
+/* ── システムメッセージ（オープニング・大オチ用・中央オーバーレイ） ── */
+#system-msg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  pointer-events: none;
+  background: rgba(0,0,0,0);
+  transition: background 0.3s;
+}
+#system-msg.active {
+  background: rgba(0,0,0,0.55);
+}
+.system-text {
+  display: inline-block;
+  color: #e8e9ec;
+  font-size: clamp(14px, 2vw, 22px);
+  letter-spacing: 0.08em;
+  line-height: 2;
+  text-align: center;
+  max-width: 80%;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+  padding: 1.5em 2em;
+  background: rgba(10,14,22,0.7);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+/* ── 縦向き警告（スマホ縦持ち時） ── */
+#portrait-warning {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #0f1118;
+  z-index: 9999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1em;
+  text-align: center;
+  padding: 2em;
+}
+#portrait-warning.show { display: flex; }
+#portrait-warning .icon { font-size: 3em; }
+#portrait-warning p {
+  color: rgba(255,255,255,0.7);
+  font-size: clamp(13px, 3vw, 16px);
+  line-height: 1.8;
+  letter-spacing: 0.05em;
+}
+
+/* ── タイトル画面 ── */
+#title-screen {
+  position: absolute;
+  inset: 0;
+  background: #0f1118;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 70;
+  transition: opacity 0.6s ease;
+}
+#title-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+#title-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1em;
+  text-align: center;
+  padding: 2em;
+}
+#title-label {
+  font-size: clamp(10px, 1.2vw, 13px);
+  color: var(--text-dim);
+  letter-spacing: 0.15em;
+}
+#title-main {
+  font-family: "Noto Serif JP", serif;
+  font-size: clamp(22px, 3.5vw, 42px);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.1em;
+  line-height: 1.3;
+}
+#title-sub {
+  font-size: clamp(13px, 1.8vw, 20px);
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  margin-top: -0.5em;
+}
+#btn-start {
+  margin-top: 1.5em;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: "Noto Sans JP", sans-serif;
+  font-size: clamp(13px, 1.6vw, 18px);
+  letter-spacing: 0.15em;
+  padding: 0.7em 2.5em;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+#btn-start:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.5);
+}
+#title-note {
+  margin-top: 1em;
+  font-size: clamp(9px, 1vw, 11px);
+  color: rgba(255,255,255,0.2);
+  letter-spacing: 0.06em;
+}
+#mobile-hint {
+  display: none;
+  margin-top: 0.8em;
+  font-size: clamp(10px, 1.1vw, 12px);
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.04em;
+}
+/* スマホ（タッチデバイス）のみ表示 */
+@media (hover: none) and (pointer: coarse) {
+  #mobile-hint { display: block; }
+}
+
+/* ── END画面 ── */
+#end-screen {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,12,18,0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1em;
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s;
+  overflow-y: auto;
+  padding: 5% 4% 8%;
+  -webkit-overflow-scrolling: touch;
+}
+#end-screen.visible { opacity: 1; pointer-events: auto; }
+#end-screen h2 {
+  font-size: clamp(14px, 2vw, 22px);
+  color: var(--text);
+  letter-spacing: 0.05em;
+  margin-top: 0.5em;
+  flex-shrink: 0;
+}
+#end-screen p {
+  font-size: clamp(11px, 1.4vw, 16px);
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.8;
+  max-width: 400px;
+  flex-shrink: 0;
+}
+.score-display {
+  font-size: clamp(13px, 1.6vw, 18px);
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.btn-restart {
+  background: var(--name-bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: clamp(11px, 1.3vw, 15px);
+  font-weight: 700;
+  padding: 0.6em 1.8em;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  margin-top: 0.5em;
+  margin-bottom: 1em;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.btn-restart:hover { background: rgba(46,64,87,0.9); }
+
+/* ── オート・スキップ インジケーター ── */
+#auto-indicator {
+  position: absolute;
+  top: 8%;
+  left: 2%;
+  color: var(--accent-warm);
+  font-size: clamp(9px, 1vw, 12px);
+  letter-spacing: 0.08em;
+  z-index: 30;
+  display: none;
+}
+#auto-indicator.show { display: block; }
+
+/* ── モバイル対応 ── */
+@media (max-width: 600px) {
+  #sysbtn-wrap { top: 1%; right: 1%; gap: 0.3em; }
+  .sys-btn { padding: 0.25em 0.5em; }
+  #textbox { min-height: 32%; max-height: 58%; }
+}
+
+/* ── PCウィンドウフレーム（1on1中のみ表示） ── */
+#vn-window {
+  position: absolute;
+  /* 16:9アスペクト比を維持しつつ中央配置 */
+  left: 5%;
+  right: 5%;
+  top: 3%;
+  aspect-ratio: 16 / 9;
+  /* heightはaspect-ratioで自動計算 */
+  border-radius: 8px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  opacity: 0;
+  transform: scale(0.88) translateY(20px);
+  transition: opacity 0.45s cubic-bezier(0.2,0.8,0.3,1), transform 0.45s cubic-bezier(0.2,0.8,0.3,1);
+  pointer-events: none;
+}
+#vn-window.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+/* 起動アニメーション用 */
+#vn-window.launching {
+  opacity: 0;
+  transform: scale(0.7) translateY(30px);
+}
+
+/* タイトルバー */
+#vn-titlebar {
+  background: linear-gradient(90deg, #3a3a3c 0%, #2d2d30 100%);
+  border-radius: 8px 8px 0 0;
+  padding: 0 0.8em;
+  height: clamp(24px, 3.5%, 34px);
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(0,0,0,0.3);
+  user-select: none;
+}
+.win-btn {
+  width: clamp(9px, 1.2vw, 14px);
+  height: clamp(9px, 1.2vw, 14px);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.win-btn.close  { background: #ff5f56; }
+.win-btn.min    { background: #ffbd2e; }
+.win-btn.max    { background: #27c93f; }
+#vn-titlebar-text {
+  font-size: clamp(9px, 1vw, 12px);
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.06em;
+  margin-left: 0.4em;
+}
+
+/* ウィンドウ内コンテンツ（背景＋立ち絵） */
+#vn-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  border-radius: 0 0 8px 8px;
+}
+
+/* 起動ローディング表示 */
+#vn-launch-overlay {
+  position: absolute;
+  inset: 0;
+  background: #1a1a1e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1em;
+  z-index: 20;
+  border-radius: 0 0 8px 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+#vn-launch-overlay.show { opacity: 1; pointer-events: auto; }
+#launch-title {
+  color: #8ab4d4;
+  font-size: clamp(12px, 1.5vw, 18px);
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+#launch-bar-wrap {
+  width: 60%;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+#launch-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6fa3d0, #27c93f);
+  width: 0%;
+  border-radius: 2px;
+  transition: width 0.05s linear;
+}
+#launch-status {
+  color: rgba(255,255,255,0.4);
+  font-size: clamp(8px, 0.9vw, 11px);
+  letter-spacing: 0.08em;
+}
+
+/* ウィンドウ内トランジション表示 */
+#vn-transition-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 17, 24, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8em;
+  z-index: 20;
+  border-radius: 0 0 8px 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+#vn-transition-overlay.show { opacity: 1; }
+#transition-msg {
+  color: #8ab4d4;
+  font-size: clamp(11px, 1.4vw, 16px);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+/* 背景画像レイヤー */
+#bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity 0.5s ease;
+  z-index: 1;
+}
+/* フレームなし状態（オープニング・大オチ）の背景は#gameに直接 */
+#game-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity 0.5s ease;
+  z-index: 0;
+}
+
+/* 立ち絵レイヤー（ウィンドウ内） */
+#character-win {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 95%;
+  max-width: 60%;
+  object-fit: contain;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+#character-win.visible { opacity: 1; }
+
+/* 立ち絵レイヤー（ウィンドウ外・オープニング/エンディング用） */
+#character-game {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 95%;
+  max-width: 75%;
+  object-fit: contain;
+  object-position: bottom;
+  z-index: 19;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+#character-game.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="game">
+  <!-- ゲーム全体背景（オープニング・大オチ用） -->
+  <div id="game-bg"></div>
+
+  <!-- プログレス -->
+  <div id="progress-wrap"><div id="progress-fill"></div></div>
+
+  <!-- システムボタン -->
+  <div id="sysbtn-wrap">
+    <button class="sys-btn" id="btn-log">ログ</button>
+    <button class="sys-btn" id="btn-auto">オート</button>
+    <button class="sys-btn" id="btn-skip">スキップ</button>
+  </div>
+
+  <!-- オート表示 -->
+  <div id="auto-indicator">▶▶ AUTO</div>
+
+  <!-- ト書き・内心（中央） -->
+  <div id="stage-text"></div>
+
+  <!-- システムメッセージ（上部） -->
+  <div id="system-msg"></div>
+
+  <!-- PCウィンドウフレーム（1on1中のみ表示） -->
+  <div id="vn-window">
+    <div id="vn-titlebar">
+      <div class="win-btn close"></div>
+      <div class="win-btn min"></div>
+      <div class="win-btn max"></div>
+      <span id="vn-titlebar-text">1on1練習シミュレーター v1.0 — 株式会社○○</span>
+    </div>
+    <div id="vn-content">
+      <!-- 起動ローディング -->
+      <div id="vn-launch-overlay">
+        <div id="launch-title">1on1練習シミュレーター</div>
+        <div id="launch-bar-wrap"><div id="launch-bar"></div></div>
+        <div id="launch-status">システムを起動しています...</div>
+      </div>
+      <!-- トランジション表示 -->
+      <div id="vn-transition-overlay">
+        <div id="transition-msg"></div>
+      </div>
+      <!-- 背景 -->
+      <div id="bg"></div>
+      <!-- 立ち絵（ウィンドウ内） -->
+      <img id="character-win" src="" alt="">
+    </div>
+  </div>
+
+  <!-- 立ち絵（ウィンドウ外・オープニング/エンディング用） -->
+  <img id="character-game" src="" alt="">
+
+  <!-- テキストボックス -->
+  <div id="textbox">
+    <div id="speaker-name"></div>
+    <div id="dialogue-text"></div>
+    <div id="advance-indicator">▼ クリックして進む</div>
+  </div>
+
+  <!-- 選択肢オーバーレイ -->
+  <div id="choices-overlay">
+    <div id="choices-prompt">選択してください</div>
+    <div id="choices-list"></div>
+  </div>
+
+  <!-- バックログ -->
+  <div id="log-overlay"></div>
+  <div id="log-drawer">
+    <div id="log-header">
+      <span>バックログ</span>
+      <button id="log-close">✕</button>
+    </div>
+    <div id="log-body"></div>
+  </div>
+
+  <!-- 縦向き警告 -->
+  <div id="portrait-warning">
+    <div class="icon">↻</div>
+    <p>横向きでプレイしてください</p>
+  </div>
+
+  <!-- タイトル画面 -->
+  <div id="title-screen">
+    <div id="title-inner">
+      <div id="title-label">株式会社○○　人事部</div>
+      <h1 id="title-main">1on1練習シミュレーター</h1>
+      <div id="title-sub">（仮）</div>
+      <button id="btn-start">▶ はじめる</button>
+      <div id="title-note">※本ソフトウェアはAIが部下役を務めます。安心してご利用ください。</div>
+      <div id="mobile-hint">📱 スマホの方は「はじめる」を押すとフルスクリーンになります</div>
+    </div>
+  </div>
+
+  <!-- END画面 -->
+  <div id="end-screen">
+    <h2 id="end-title">シミュレーション終了</h2>
+    <p id="end-body"></p>
+    <p class="score-display" id="end-score"></p>
+    <button class="btn-restart" id="btn-restart">最初からやり直す</button>
+  </div>
+</div>
+
+<script src="scenario.js"></script>
+<script>
+const ASSETS = {
+  char_hr_light: "assets/char_hr_light.webp",
+  char_hr_dark: "assets/char_hr_dark.webp",
+  bg_office: "assets/bg_office.webp",
+  bg_conf_a: "assets/bg_conf_a.webp",
+  bg_conf_b: "assets/bg_conf_b.webp",
+  char_mauta: "assets/char_mauta.webp",
+  char_ishiwari: "assets/char_ishiwari.webp",
+  char_suzuki: "assets/char_suzuki.webp",
+};
+
+// 外部化した画像を先読み（表示時のちらつき防止）
+Object.values(ASSETS).forEach(src => { const img = new Image(); img.src = src; });
+
+/* ゲームデータ：開発時は scenario.js から読込。ビルド時にここへインライン化される */
+// @SCENARIO_INLINE@
+
+/* ============================================================
+   状態
+   ============================================================ */
+const state = {
+  current: GAME.start,
+  beatIndex: 0,
+  score: { sincerity: 0, listening: 0 }, // 2軸スコア
+  pathLength: 0,
+  log: [],       // バックログ
+  auto: false,   // オートモード
+  skip: false,   // スキップモード
+  autoTimer: null,
+};
+
+/* ============================================================
+   DOM参照
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const game       = $("game");
+const textbox    = $("textbox");
+const speakerEl  = $("speaker-name");
+const dialogueEl = $("dialogue-text");
+const advanceInd = $("advance-indicator");
+const stageText  = $("stage-text");
+const systemMsg  = $("system-msg");
+const choicesOvl = $("choices-overlay");
+const choicesList = $("choices-list");
+const logDrawer  = $("log-drawer");
+const logOverlay = $("log-overlay");
+const logBody    = $("log-body");
+const endScreen  = $("end-screen");
+const progFill   = $("progress-fill");
+const autoInd    = $("auto-indicator");
+
+/* ============================================================
+   スコアマッピング（選択肢タグ→2軸加点）
+   ============================================================ */
+const SCORE_MAP = {
+  normal:  { sincerity: 2, listening: 2 },  // 正解系
+  weird:   { sincerity: 1, listening: 0 },  // 罠系
+  crazy:   { sincerity: 0, listening: 0 },  // ふざけ系
+};
+
+// 傾聴度：特定シーンの選択肢は別途加点
+const LISTENING_BONUS = {
+  // 相手の世界に乗っかる選択肢は、誠実度とは別に傾聴度を加点
+  ishiwari_014: 3,  // 推しキャラ談義に乗っかる
+  ishiwari_022: 3,  // デッキコストのたとえ話
+};
+
+/* ============================================================
+   ユーティリティ
+   ============================================================ */
+function currentScene() { return GAME.scenes[state.current]; }
+
+function updateProgress() {
+  // 1プレイで通過するシーン数はルートに関わらず32〜34（全シーン数=78ではない）
+  const EXPECTED_PATH = 33;
+  const pct = Math.min(97, 2 + (state.pathLength / EXPECTED_PATH) * 95);
+  progFill.style.width = pct + "%";
+}
+
+function pushLog(type, speaker, text) {
+  state.log.push({ type, speaker, text });
+  const entry = document.createElement("div");
+  entry.classList.add("log-entry");
+  if (type === "stage") entry.classList.add("log-stage");
+  if (speaker) {
+    const sp = document.createElement("div");
+    sp.classList.add("log-speaker");
+    sp.textContent = speaker;
+    entry.appendChild(sp);
+  }
+  const tx = document.createElement("div");
+  tx.classList.add("log-text");
+  tx.textContent = text;
+  entry.appendChild(tx);
+  logBody.appendChild(entry);
+  logBody.scrollTop = logBody.scrollHeight;
+}
+
+/* ============================================================
+   画面演出：背景・立ち絵・ウィンドウフレーム制御
+   ============================================================ */
+
+// シーンIDから背景・立ち絵・ウィンドウ状態を決定
+const SCENE_PRESENTATION = {
+  // bg_game: ゲーム全体の背景（現実世界・後ろ側）
+  // bg_win:  ウィンドウ内の背景（PC世界） nullならCSS薄青グラデーションのまま
+  // char: キャラキー
+  // window: PCウィンドウ表示するか
+  opening_01:  { bg_game: 'bg_office',  bg_win: null, char: null,             window: false },
+  mauta_:      { bg_game: 'bg_conf_a',  bg_win: null, char: 'char_mauta',   window: true  },
+  ishiwari_:   { bg_game: 'bg_conf_a',  bg_win: null, char: 'char_ishiwari',window: true  },
+  suzuki_:     { bg_game: 'bg_conf_a',  bg_win: null, char: 'char_suzuki',  window: true  },
+  transition_mauta_to_ishiwari: { bg_game: 'bg_conf_a',  bg_win: null, char: null, window: true  },
+  transition_ishiwari_to_suzuki: { bg_game: 'bg_conf_a',  bg_win: null, char: null, window: true  },
+  ending_01:   { bg_game: 'bg_conf_a',  bg_win: null, char: null,           window: false },
+  ending_02:   { bg_game: 'bg_conf_b',  bg_win: null, char: null,           window: false },
+  ending_03:   { bg_game: 'bg_conf_b',  bg_win: null, char: 'char_hr_light', window: false },
+  ending_04:   { bg_game: 'bg_conf_b',  bg_win: null, char: 'char_hr_dark',  window: false },
+  end_ending:  { bg_game: 'bg_conf_b',  bg_win: null, char: null,           window: false },
+};
+
+function getPresentationForScene(sceneId) {
+  if (SCENE_PRESENTATION[sceneId]) return SCENE_PRESENTATION[sceneId];
+  for (const [prefix, pres] of Object.entries(SCENE_PRESENTATION)) {
+    if (prefix.endsWith('_') && sceneId.startsWith(prefix)) return pres;
+  }
+  return { bg_game: null, bg_win: null, char: null, window: false };
+}
+
+const bgEl       = document.getElementById('bg');
+const gameBgEl   = document.getElementById('game-bg');
+const charWinEl  = document.getElementById('character-win');
+const charGameEl = document.getElementById('character-game');
+const vnWindow   = document.getElementById('vn-window');
+
+let currentBg     = null;
+let currentBgWin  = null;
+let currentChar   = null;
+let currentWindow = false;
+
+function applyPresentation(sceneId) {
+  const pres = getPresentationForScene(sceneId);
+
+  // ゲーム全体背景（外側・現実世界）
+  if (pres.bg_game && pres.bg_game !== currentBg) {
+    gameBgEl.style.backgroundImage = `url("${ASSETS[pres.bg_game]}")`;
+    currentBg = pres.bg_game;
+  }
+
+  // ウィンドウ内背景（PC世界）
+  if (pres.bg_win !== currentBgWin) {
+    bgEl.style.backgroundImage = pres.bg_win && ASSETS[pres.bg_win]
+      ? `url("${ASSETS[pres.bg_win]}")` : '';
+    currentBgWin = pres.bg_win;
+  }
+
+  // ウィンドウフレーム切り替え
+  if (pres.window !== currentWindow) {
+    currentWindow = pres.window;
+    if (pres.window) {
+      vnWindow.classList.add('visible');
+      // ゲーム側の立ち絵を消す
+      charGameEl.classList.remove('visible');
+      charGameEl.src = '';
+      if (!launchDone) {
+        launchDone = true;
+        if (pres.char && ASSETS[pres.char]) {
+          charWinEl.src = ASSETS[pres.char];
+          currentChar = pres.char;
+        }
+        playLaunchAnimation(() => {
+          charWinEl.classList.add('visible');
+          advanceSequence();
+        });
+        return;
+      }
+    } else {
+      vnWindow.classList.remove('visible');
+      // ウィンドウ内の立ち絵を消す
+      charWinEl.classList.remove('visible');
+      charWinEl.src = '';
+    }
+  }
+
+  // 立ち絵切り替え（ウィンドウ内 or 外を自動選択）
+  if (pres.char !== currentChar) {
+    charWinEl.classList.remove('visible');
+    charGameEl.classList.remove('visible');
+
+    if (pres.char && ASSETS[pres.char]) {
+      if (pres.window) {
+        charWinEl.src = ASSETS[pres.char];
+        charWinEl.classList.add('visible');
+      } else {
+        charGameEl.src = ASSETS[pres.char];
+        charGameEl.classList.add('visible');
+      }
+    } else {
+      charWinEl.src = '';
+      charGameEl.src = '';
+    }
+    currentChar = pres.char;
+  }
+}
+
+
+/* ============================================================
+   アプリ起動演出
+   ============================================================ */
+let launchDone = false;
+let isLaunching = false; // 起動演出中フラグ
+
+function playLaunchAnimation(callback) {
+  const overlay  = document.getElementById('vn-launch-overlay');
+  const bar      = document.getElementById('launch-bar');
+  const status   = document.getElementById('launch-status');
+  const messages = [
+    'AIモジュールを初期化しています...',
+    '部下データベースに接続しています...',
+    '会話エンジンを起動しています...',
+    'システムの準備が完了しました',
+  ];
+
+  isLaunching = true; // 起動演出開始
+  overlay.classList.add('show');
+  let pct = 0;
+  let msgIdx = 0;
+
+  const tick = setInterval(() => {
+    pct += Math.random() * 8 + 4;
+    if (pct > 100) pct = 100;
+    bar.style.width = pct + '%';
+    if (msgIdx < messages.length && pct > (msgIdx + 1) * 22) {
+      status.textContent = messages[msgIdx++];
+    }
+    if (pct >= 100) {
+      clearInterval(tick);
+      setTimeout(() => {
+        overlay.style.transition = 'opacity 0.5s';
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+          overlay.classList.remove('show');
+          overlay.style.opacity = '';
+          overlay.style.transition = '';
+          bar.style.width = '0%';
+          isLaunching = false; // 起動演出終了
+          if (callback) callback();
+        }, 500);
+      }, 300);
+    }
+  }, 60);
+}
+
+/* ============================================================
+   話者ベースの立ち絵制御（ウィンドウ外シーン用）
+   ============================================================ */
+const HR_LIGHT_SCENES = ['opening_01', 'ending_03'];
+const HR_DARK_SCENES  = ['ending_04'];
+
+function updateGameCharForSpeaker(speaker, sceneId) {
+  if (currentWindow) return;
+
+  if (HR_DARK_SCENES.some(s => sceneId.startsWith(s))) {
+    if (!charGameEl.src || !charGameEl.src.includes('char_hr_dark')) {
+      charGameEl.src = ASSETS['char_hr_dark'];
+    }
+    charGameEl.classList.add('visible');
+    return;
+  }
+
+  if (HR_LIGHT_SCENES.some(s => sceneId.startsWith(s))) {
+    if (speaker === '人事部代表') {
+      if (!charGameEl.src || !charGameEl.src.includes('char_hr_light')) {
+        charGameEl.src = ASSETS['char_hr_light'];
+      }
+      charGameEl.classList.add('visible');
+    } else {
+      charGameEl.classList.remove('visible');
+    }
+    return;
+  }
+
+  charGameEl.classList.remove('visible');
+}
+
+function formatText(text) {
+  // 句点（。！？）でのみ改行を挿入（読点では改行しない）
+  // 25文字以上の行が句点に来たタイミングで折り返す
+  if (!text || text.length <= 25) return text;
+  let result = "";
+  let lineLen = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    result += ch;
+    lineLen++;
+    if (lineLen >= 25 && /[。！？]/.test(ch)) {
+      const next = text[i + 1] || "";
+      if (!/[」』）\s]/.test(next)) {
+        result += "\n";
+        lineLen = 0;
+      }
+    }
+  }
+  return result;
+}
+
+/* ============================================================
+   キャラ名バッジの色決定
+   ============================================================ */
+const SPEAKER_COLORS = {
+  "あなた":       { bg: "#2c3a4a", text: "#8fb8d8" },  // 上司：落ち着いたスレートブルー
+  "真受田":       { bg: "#3a2a1a", text: "#d4956a" },  // 真受田：テラコッタ系
+  "石割":         { bg: "#1a2e2a", text: "#6db89a" },  // 石割：テック系グリーン
+  "鈴木":         { bg: "#2a2035", text: "#9b8fc0" },  // 鈴木：落ち着いた紫
+  "人事部代表":   { bg: "#2e1e1e", text: "#b06060" },  // 人事部：赤みがかったダーク
+  "通知":         { bg: "#1a2030", text: "#7090b0" },  // システム通知
+};
+const DEFAULT_SPEAKER_COLOR = { bg: "#2e4057", text: "#e8e9ec" };
+
+function getSpeakerColor(speaker) {
+  if (!speaker) return DEFAULT_SPEAKER_COLOR;
+  // 前方一致で探す（「真受田」が「真受田（嬉しそうに）」にもマッチするように）
+  for (const [key, color] of Object.entries(SPEAKER_COLORS)) {
+    if (speaker.startsWith(key)) return color;
+  }
+  return DEFAULT_SPEAKER_COLOR;
+}
+
+/* ============================================================
+   テキストボックス 表示制御
+   ============================================================ */
+function showDialogue(speaker, text, isThought = false) {
+  stageText.innerHTML = "";
+  systemMsg.innerHTML = "";
+  systemMsg.classList.remove("active");
+  textbox.classList.remove("hidden");
+
+  // 話者ベースの立ち絵制御（ウィンドウ外シーン用）
+  updateGameCharForSpeaker(isThought ? 'あなた' : (speaker || ''), state.current);
+
+  // キャラ名バッジの色設定
+  const color = getSpeakerColor(speaker);
+  speakerEl.style.background = color.bg;
+  speakerEl.style.color = color.text;
+
+  if (isThought) {
+    // 内心モノローグ：「あなた」名義で括弧書き＋イタリック体で表示
+    const thoughtColor = getSpeakerColor("あなた");
+    speakerEl.textContent = "あなた";
+    speakerEl.style.background = thoughtColor.bg;
+    speakerEl.style.color = thoughtColor.text;
+    dialogueEl.textContent = "（" + formatText(text) + "）";
+    dialogueEl.style.color = "#a0a4b0";
+    dialogueEl.style.fontStyle = "italic";
+  } else {
+    speakerEl.textContent = speaker || "";
+    dialogueEl.textContent = formatText(text);
+    dialogueEl.style.color = "";
+    dialogueEl.style.fontStyle = "";
+  }
+
+  advanceInd.classList.add("show");
+  if (text) pushLog(isThought ? "thought" : "dialogue", isThought ? "心の声" : speaker, text);
+}
+
+function showStage(text) {
+  // ト書きはテキストボックス内に表示（背景に重ならない）
+  // ト書き中は人事部代表の立ち絵を非表示
+  updateGameCharForSpeaker('', state.current);
+  stageText.innerHTML = "";
+  systemMsg.innerHTML = "";
+  systemMsg.classList.remove("active");
+  textbox.classList.remove("hidden");
+
+  // 話者名なし・イタリック・薄い色でト書きとして表示
+  speakerEl.textContent = "";
+  speakerEl.style.background = "";
+  speakerEl.style.color = "";
+  dialogueEl.textContent = text;
+  dialogueEl.style.color = "#8a8d96";
+  dialogueEl.style.fontStyle = "italic";
+
+  advanceInd.classList.add("show");
+  pushLog("stage", "", text);
+}
+
+function showSystem(text) {
+  // ウィンドウが表示中（トランジション中）はウィンドウ内オーバーレイに表示
+  if (currentWindow) {
+    textbox.classList.add("hidden");
+    stageText.innerHTML = "";
+    systemMsg.innerHTML = "";
+    systemMsg.classList.remove("active");
+    const overlay = document.getElementById('vn-transition-overlay');
+    const msg = document.getElementById('transition-msg');
+    msg.textContent = text;
+    overlay.classList.add('show');
+    pushLog("system", "", text);
+    return;
+  }
+  textbox.classList.add("hidden");
+  stageText.innerHTML = "";
+  systemMsg.innerHTML = `<p class="system-text">${text}</p>`;
+  systemMsg.classList.add("active");
+  pushLog("system", "", text);
+}
+
+function clearAll() {
+  textbox.classList.add("hidden");
+  stageText.innerHTML = "";
+  systemMsg.innerHTML = "";
+  systemMsg.classList.remove("active");
+  // ウィンドウ内トランジションオーバーレイも消す
+  const overlay = document.getElementById('vn-transition-overlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+/* ============================================================
+   beat を1つ表示
+   ============================================================ */
+function renderBeat(beat) {
+  if (beat.k === "d") {
+    showDialogue(beat.s, beat.t, false);
+  } else if (beat.k === "stage") {
+    showStage(beat.t);
+  } else if (beat.k === "thought") {
+    // 内心モノローグ → テキストボックスに括弧書きで表示
+    showDialogue("", beat.t, true);
+  } else if (beat.k === "system") {
+    showSystem(beat.t);
+  }
+}
+
+/* ============================================================
+   選択肢表示
+   ============================================================ */
+function showChoices(scene) {
+  clearAll();
+  choicesList.innerHTML = "";
+
+  // 選択肢前のbeatsを全部順番に表示してからクリック待ち、その後選択肢を出す
+  const beats = scene.beats || [];
+
+  function buildChoiceButtons() {
+    choicesList.innerHTML = "";
+    scene.choices.forEach(choice => {
+      const btn = document.createElement("button");
+      btn.classList.add("choice-btn");
+      btn.textContent = choice.label;
+      btn.addEventListener("click", () => {
+        const s = SCORE_MAP[choice.type] || { sincerity: 0, listening: 0 };
+        state.score.sincerity += s.sincerity;
+        state.score.listening += s.listening + (LISTENING_BONUS[choice.next] || 0);
+        choicesOvl.classList.remove("visible");
+        state.current = choice.next;
+        state.beatIndex = 0;
+        state.pathLength++;
+        updateProgress();
+        render();
+      });
+      choicesList.appendChild(btn);
+    });
+    choicesOvl.classList.add("visible");
+  }
+
+  if (beats.length === 0) {
+    // beatsなし → すぐ選択肢表示
+    buildChoiceButtons();
+    return;
+  }
+
+  // beats を1つずつ表示してクリック待ち
+  let beatIdx = 0;
+
+  function nextChoiceBeat() {
+    if (beatIdx < beats.length) {
+      renderBeat(beats[beatIdx]);
+      beatIdx++;
+      state._choiceBeatAdvance = nextChoiceBeat;
+
+      // スキップ中は即座に次へ
+      if (state.skip && !isLaunching) {
+        setTimeout(nextChoiceBeat, 80);
+      } else if (state.auto && !isLaunching) {
+        clearTimeout(state.autoTimer);
+        state.autoTimer = setTimeout(nextChoiceBeat, 1800);
+      }
+    } else {
+      // 全beats表示完了 → 選択肢表示
+      state._choiceBeatAdvance = null;
+      textbox.classList.add("hidden");
+      advanceInd.classList.remove("show");
+      buildChoiceButtons();
+    }
+  }
+
+  // choiceシーン用のクリックハンドラを一時的に使う
+  state._choiceBeatAdvance = nextChoiceBeat;
+  nextChoiceBeat();
+}
+
+/* ============================================================
+   sequence 進行
+   ============================================================ */
+function advanceSequence() {
+  const scene = currentScene();
+  if (!scene || scene.type !== "sequence") return;
+
+  if (state.beatIndex < scene.beats.length) {
+    renderBeat(scene.beats[state.beatIndex]);
+    state.beatIndex++;
+
+    // オート・スキップ
+    if (state.skip && !isLaunching) {
+      setTimeout(advanceSequence, 80);
+    } else if (state.auto && !isLaunching) {
+      clearTimeout(state.autoTimer);
+      state.autoTimer = setTimeout(advanceSequence, 1800);
+    }
+  } else {
+    // 次シーンへ
+    if (scene.next) {
+      state.current = scene.next;
+      state.beatIndex = 0;
+      state.pathLength++;
+      updateProgress();
+      render();
+    } else {
+      renderEnd();
+    }
+  }
+}
+
+/* ============================================================
+   メインrender
+   ============================================================ */
+function render() {
+  const scene = currentScene();
+  if (!scene) { renderEnd(); return; }
+
+  choicesOvl.classList.remove("visible");
+  // トランジションオーバーレイを消す
+  const transOvl = document.getElementById('vn-transition-overlay');
+  if (transOvl) transOvl.classList.remove('show');
+
+  applyPresentation(state.current);
+
+  if (scene.type === "sequence") {
+    advanceSequence();
+  } else if (scene.type === "choice") {
+    showChoices(scene);
+  } else if (scene.type === "end") {
+    renderEnd();
+  }
+}
+
+/* ============================================================
+   大オチ・診断
+   ============================================================ */
+function diagnoseType() {
+  const { sincerity, listening } = state.score;
+  if (sincerity > 7 && listening > 7) return {
+    type: "ザ・教科書上司",
+    desc: "あなたは、1on1において非常に誠実に、かつ相手の話をきちんと引き出せるタイプです。オウム返し、場面を聞く、本人が気づくまで待つ——研修の申し子と呼んでいいほど、正しい手順を踏んでいます。\n\nただ一つ気になるのは、「正しいこと」をやりすぎていないか、ということです。教科書通りであることと、相手の心が動いたかどうかは、必ずしも一致しません。\n\nそれでも、あなたの姿勢は本物です。あとは少しだけ、ハミ出してみてください。"
+  };
+  if (sincerity > 7) return {
+    type: "正論モンスター",
+    desc: "あなたは、1on1に真剣に取り組んでいます。その熱量は本物です。\n\nただ、その熱量の矛先が、少し「自分」に向きすぎているかもしれません。善意の一方通行——相手が話し始める前に、あなたの答えが出てしまっているのです。\n\n熱血空回り系、と言うと少し失礼ですが、あなたの誠実さは本物なので、もう少しだけ「聞く」に時間を使ってみてください。"
+  };
+  if (listening > 7) return {
+    type: "なんでも乗っかる人",
+    desc: "あなたは、相手のノリに乗ることが得意です。推しキャラの話が出たら一緒に深掘りし、デッキコストで人材を例えてみる——気づいたら相手の世界に入っていた。\n\n空気は読める系として、これは本物のスキルです。ただ、乗っかった先に「で、相手の悩みはどこへ行きましたか？」という問いが残ります。\n\n相手のノリに乗る力を、悩みの核心に向けてみてください。"
+  };
+  return {
+    type: "完全フリースタイル",
+    desc: "あなたは、AIだから何してもいいと思っていましたね。\n\n無法地帯——という表現が正確かもしれません。水星逆行、謎の芸人の名言、部下へのAI認定、観葉植物……あなたが今日選んだ選択肢は、1on1の教科書のどこにも載っていません。\n\nただ、これだけは言えます。あなたは正直でした。それが今日、すべて記録されていたわけですが。"
+  };
+}
+
+function diagnoseRisk() {
+  const s = state.score.sincerity;
+  if (s <= 5) return { label: "高", verdict: "リストラ確定", msg: "AIが相手だと思って、本音が出ましたね。" };
+  if (s <= 9) return { label: "中", verdict: "リストラ候補", msg: "惜しいところもありましたが、ギリギリです。" };
+  return { label: "低", verdict: "リストラ対象外", msg: "本当に、いつもこうですか？" };
+}
+
+function renderEnd() {
+  const diag = diagnoseType();
+  const risk = diagnoseRisk();
+  $("end-title").textContent = "結果";
+  $("end-body").innerHTML =
+    `<div style="margin-bottom:1em;">` +
+    `<span style="font-size:0.85em;color:var(--text-dim);letter-spacing:0.1em;">ハラスメントリスク判定</span><br>` +
+    `<strong style="font-size:1.3em;color:${risk.label==='高'?'#c05050':risk.label==='中'?'#c97d4e':'#6db89a'}">${risk.verdict}</strong>` +
+    `　<span style="color:var(--text-dim);font-size:0.9em;">${risk.msg}</span>` +
+    `</div>` +
+    `<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:1em;">` +
+    `<span style="font-size:0.85em;color:var(--text-dim);letter-spacing:0.1em;">あなたのタイプ</span><br>` +
+    `<strong style="font-size:1.2em;color:var(--accent);">${diag.type}</strong><br>` +
+    `<span style="font-size:0.85em;color:var(--text-dim);line-height:1.8;white-space:pre-line;">${diag.desc}</span>` +
+    `</div>`;
+  $("end-score").textContent = `誠実度 ${state.score.sincerity} / 傾聴度 ${state.score.listening}`;
+  endScreen.classList.add("visible");
+  // GA4: クリア計測（どの診断タイプ・判定に到達したか）
+  if (typeof gtag === "function") {
+    gtag("event", "game_complete", {
+      diag_type: diag.type,
+      risk_verdict: risk.verdict,
+      sincerity: state.score.sincerity,
+      listening: state.score.listening
+    });
+  }
+}
+
+/* ============================================================
+   クリックで次へ
+   ============================================================ */
+textbox.addEventListener("click", () => {
+  if (state.auto || state.skip || isLaunching) return;
+  // choiceシーンのbeat送り中
+  if (state._choiceBeatAdvance) {
+    state._choiceBeatAdvance();
+    return;
+  }
+  const scene = currentScene();
+  if (scene && scene.type === "sequence") advanceSequence();
+});
+
+// ゲーム画面全体クリックで進む（テキストボックス・システムボタン以外）
+game.addEventListener("click", e => {
+  const t = e.target;
+  // クリックを無視する要素
+  const ignore = [
+    $("choices-overlay"), $("log-drawer"), $("log-overlay"),
+    $("end-screen"), $("sysbtn-wrap"), $("progress-wrap"),
+  ];
+  for (const el of ignore) {
+    if (el && el.contains(t)) return;
+  }
+  if (state.auto || state.skip || isLaunching) return;
+
+  // choiceシーンのbeat送り中
+  if (state._choiceBeatAdvance) {
+    state._choiceBeatAdvance();
+    return;
+  }
+
+  const scene = currentScene();
+  if (scene && scene.type === "sequence") advanceSequence();
+});
+
+/* ============================================================
+   システムボタン
+   ============================================================ */
+$("btn-log").addEventListener("click", () => {
+  logDrawer.classList.toggle("open");
+  logOverlay.classList.toggle("show");
+  logBody.scrollTop = logBody.scrollHeight;
+});
+$("log-close").addEventListener("click", () => {
+  logDrawer.classList.remove("open");
+  logOverlay.classList.remove("show");
+});
+logOverlay.addEventListener("click", () => {
+  logDrawer.classList.remove("open");
+  logOverlay.classList.remove("show");
+});
+
+$("btn-auto").addEventListener("click", () => {
+  if (isLaunching) return; // 起動演出中は無効
+  state.auto = !state.auto;
+  $("btn-auto").classList.toggle("active", state.auto);
+  autoInd.classList.toggle("show", state.auto);
+  if (state.auto) {
+    state.skip = false;
+    $("btn-skip").classList.remove("active");
+    const scene = currentScene();
+    if (scene && scene.type === "sequence") {
+      clearTimeout(state.autoTimer);
+      state.autoTimer = setTimeout(advanceSequence, 1800);
+    }
+  } else {
+    clearTimeout(state.autoTimer);
+  }
+});
+
+$("btn-skip").addEventListener("click", () => {
+  if (isLaunching) return; // 起動演出中は無効
+  state.skip = !state.skip;
+  $("btn-skip").classList.toggle("active", state.skip);
+  if (state.skip) {
+    state.auto = false;
+    $("btn-auto").classList.remove("active");
+    autoInd.classList.remove("show");
+    // choiceのbeat送り中ならそちらを進める
+    if (state._choiceBeatAdvance) {
+      state._choiceBeatAdvance();
+    } else {
+      const scene = currentScene();
+      if (scene && scene.type === "sequence") advanceSequence();
+    }
+  }
+});
+
+$("btn-restart").addEventListener("click", () => {
+  endScreen.classList.remove("visible");
+  state.current = GAME.start;
+  state.beatIndex = 0;
+  state.score = { sincerity: 0, listening: 0 };
+  state.pathLength = 0;
+  state.log = [];
+  state.auto = false;
+  state.skip = false;
+  logBody.innerHTML = "";
+  clearTimeout(state.autoTimer);
+  $("btn-auto").classList.remove("active");
+  $("btn-skip").classList.remove("active");
+  autoInd.classList.remove("show");
+  updateProgress();
+  render();
+});
+
+/* ============================================================
+   キーボード操作
+   ============================================================ */
+document.addEventListener("keydown", e => {
+  if (isLaunching) return; // ローディング中はキー入力も無効
+  if (e.key === " " || e.key === "ArrowRight" || e.key === "Enter") {
+    if (logDrawer.classList.contains("open")) return;
+    if (state._choiceBeatAdvance) {
+      state._choiceBeatAdvance();
+    } else {
+      const scene = currentScene();
+      if (scene && scene.type === "sequence") advanceSequence();
+    }
+    e.preventDefault();
+  }
+  if (e.key === "l" || e.key === "L") $("btn-log").click();
+  if (e.key === "a" || e.key === "A") $("btn-auto").click();
+  if (e.key === "s" || e.key === "S") $("btn-skip").click();
+});
+
+/* ============================================================
+   起動
+   ============================================================ */
+// 縦向き検出（スマホのみ）
+function checkOrientation() {
+  const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const warning = document.getElementById('portrait-warning');
+  if (isMobile && isPortrait) {
+    warning.classList.add('show');
+  } else {
+    warning.classList.remove('show');
+  }
+}
+checkOrientation();
+window.addEventListener('resize', checkOrientation);
+window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 150));
+
+// スマホブラウザのアドレスバー対応：実際の表示高さをCSS変数に設定
+function setVh() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+setVh();
+window.addEventListener('resize', setVh);
+window.addEventListener('orientationchange', () => setTimeout(setVh, 100));
+updateProgress();
+// タイトル画面を表示してからスタートボタンで開始
+document.getElementById('btn-start').addEventListener('click', () => {
+  // フルスクリーン要求（スマホのアドレスバー対策）
+  const el = document.documentElement;
+  if (el.requestFullscreen) {
+    el.requestFullscreen().catch(() => {});
+  } else if (el.webkitRequestFullscreen) {
+    el.webkitRequestFullscreen();
+  }
+
+  // 横向き強制（Screen Orientation API）
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
+    }
+  } catch(e) {}
+
+  const titleScreen = document.getElementById('title-screen');
+  titleScreen.classList.add('hidden');
+  setTimeout(() => {
+    titleScreen.style.display = 'none';
+  }, 650);
+
+  // フルスクリーン移行後にrenderを呼ぶ（移行中のresizeイベントでbeatが飛ぶのを防ぐ）
+  const startRender = () => {
+    // beatIndexを確実に0にリセットしてから開始
+    state.beatIndex = 0;
+    render();
+  };
+
+  if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
+    // フルスクリーン対応ブラウザ：移行完了後に開始
+    const onFullscreen = () => {
+      document.removeEventListener('fullscreenchange', onFullscreen);
+      document.removeEventListener('webkitfullscreenchange', onFullscreen);
+      setTimeout(startRender, 100);
+    };
+    document.addEventListener('fullscreenchange', onFullscreen);
+    document.addEventListener('webkitfullscreenchange', onFullscreen);
+    // フルスクリーンにならなかった場合のフォールバック
+    setTimeout(() => {
+      if (state.current === GAME.start && state.beatIndex === 0) startRender();
+    }, 800);
+  } else {
+    // フルスクリーン非対応ブラウザ（iOS等）：即座に開始
+    startRender();
+  }
+});
+
+// フルスクリーン切り替え時にも高さを再計算
+document.addEventListener('fullscreenchange', () => setTimeout(setVh, 100));
+document.addEventListener('webkitfullscreenchange', () => setTimeout(setVh, 100));
+
+/* ============================================================
+   開発用：シーン直ジャンプ
+   使い方: game.dev.html?scene=suzuki_009 のようにURLに付ける
+   （タイトル画面を飛ばして、そのシーンから即開始）
+   ============================================================ */
+(() => {
+  const devScene = new URLSearchParams(location.search).get('scene');
+  if (!devScene) return;
+  if (!GAME.scenes[devScene]) {
+    console.warn('[dev] シーンID「' + devScene + '」が見つかりません。有効なID一覧:');
+    console.warn(Object.keys(GAME.scenes).join('\n'));
+    return;
+  }
+  const titleScreen = document.getElementById('title-screen');
+  titleScreen.classList.add('hidden');
+  titleScreen.style.display = 'none';
+  state.current = devScene;
+  state.beatIndex = 0;
+  console.info('[dev] シーン「' + devScene + '」から開始します');
+  render();
+})();
+</script>
+</body>
+</html>
