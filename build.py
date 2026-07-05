@@ -71,6 +71,10 @@ def main():
     og = HERE / "og.png"
     if og.exists():
         (OUT.parent / "og.png").write_bytes(og.read_bytes())
+    # 404ページも同梱（存在するとPagesのindex.htmlフォールバックが無効になり、正しい404が返る）
+    p404 = HERE / "404.html"
+    if p404.exists():
+        (OUT.parent / "404.html").write_bytes(p404.read_bytes())
     print(f"✔ public/index.html を生成しました（{OUT.stat().st_size // 1024}KB / 画像{n}件インライン / og.png同梱）")
     unused = [p.name for p in (HERE / "assets").iterdir() if p.name not in refs]
     if unused:
